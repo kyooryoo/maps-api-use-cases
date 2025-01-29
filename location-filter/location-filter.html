@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suburb Filter</title>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+	<script src="https://js.api.here.com/v3/3.1/mapsjs-data.js"></script>
+    <link rel="stylesheet" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
+  	<style>
+		#map {
+            width: 100%;
+            height: 760px;
+        }
+        #map .H_ib_content {
+            font-size: 13px;
+            min-width: 12em;
+        }
+    </style>
+</head>
+<body>
+    <h1>HERE Office Locations</h1>
+    <label for="offices">Select office:</label>
+    <select id="offices" onchange="filterMap()">
+        <option value="">--Select an office--</option>
+        <option value="Berlin">Berlin</option>
+        <option value="Beijing">Beijing</option>
+        <option value="Chicago">Chicago</option>
+    </select>
+		
+    <div id="map"></div>
+
+    <script>
+        const locations = {
+            "Berlin": { geo: {lat: 52.53086, lng: 13.38469}, addr: "Invalidenstrasse 116, Berlin 10115, Germanys"},
+            "Beijing": { geo: {lat: 39.91406, lng: 116.46019}, addr: "Unit 14, Level 56, China World Tower A, No.1 Jian Guo Men Wai Ave, Chaoyang District, Beijing, China"},
+            "Chicago": { geo: {lat: 41.88432, lng: -87.63877}, addr: "425 W Randolph Street, Chicago, IL 60606, USA"}
+        };
+
+        const platform = new H.service.Platform({
+            apikey: 'your_api_key'
+        });
+
+        const defaultLayers = platform.createDefaultLayers();
+        const map = new H.Map(document.getElementById('map'), defaultLayers.vector.normal.map, {
+            center: locations.Beijing.geo,  
+            zoom: 4.5,
+            pixelRatio: window.devicePixelRatio || 1
+        });
+
+        window.addEventListener('resize', () => map.getViewPort().resize());
+        const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+        const ui = H.ui.UI.createDefault(map, defaultLayers);
+
+
+
+		 function createInfoBubble(map, location) {
+            const bubble = new H.ui.InfoBubble(
+                { lng: location.geo.lng, lat: location.geo.lat + 0.01 }, 
+                { content: location.addr });
+            ui.addBubble(bubble);
+        }
+		
+        function filterMap() {
+            const office = document.getElementById('offices').value;
+			const location = locations[office];
+            // iconUrl = "https://cdn0.iconfinder.com/data/icons/daily-boxes/150/phone-box-32.png";
+            iconUrl = "https://d1.awsstatic.com/AWS%20Advertising/Curiosity%20Kid/International/Germany/here-logo_de.ba7a5100ed7b80ac7b500a3c2dce3ac691cfe1b5.png"
+			var SuburbIcon = new H.map.Icon(iconUrl, { size: { w: 30, h: 30 } });
+            if (location) {
+                map.setCenter(location.geo);
+				var SuburbMarker = new H.map.Marker({
+					lat: location.geo.lat,
+					lng: location.geo.lng
+				}, {icon: SuburbIcon});
+				map.addObject(SuburbMarker);		
+                map.setZoom(12);
+            }
+            createInfoBubble(map, location);
+        }
+    </script>
+</body>
+</html>
