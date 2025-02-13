@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="initial-scale=1.0, width=device-width" />
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-harp.js"></script>
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+    <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+    <script type="text/javascript" charset="utf-8" src="https://js.api.here.com/v3/3.1/mapsjs-ui.js" ></script>
+    <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
+    <style>
+        #search {
+          width: 50ch; /* Width to hold 50 characters */
+          margin-bottom: 10px; /* Padding at the bottom */
+          padding-top: 5px;
+          padding-bottom: 5px;
+          border: 1px solid #000; /* Optional: Added for visualization */
+        }
+      </style>
+  </head>
+
+  <body>
+    <p>This example shows how to use Geocoder API to verify an address at checkout and allow the user to fix the resulting pin via drag-n-drop when relevant.</p>
+    <label>Search: </label>
+    <input id="search" autocomplete="off" type="text" placeholder="Type in your full address, e.g. 701 Pike St, Seattle">
+    <div style="width: 1000px; height: 500px" id="mapContainer"></div>
+    <script>
+      // Check if the site was loaded via secure connection.
+      var secure = location.protocol === "https:" ? true : false;
+
+      // Create a platform object to communicate with the HERE REST APIs.
+      var platform = new H.service.Platform({
+        apikey: "api_key",
+      });
+
+      // Initialize the HARP engine type:
+      const engineType = H.Map.EngineType["HARP"];
+      var maptypes = platform.createDefaultLayers({ engineType });
+      var geocoder = platform.getSearchService();
+
+      // Instantiate a map in the 'map' div, set the base map to normal.
+      var map = new H.Map(
+        document.getElementById("mapContainer"),
+        maptypes.vector.normal.map,
+        {
+          engineType,
+          center: { lat: 47.609722, lng: -122.333056 },
+          zoom: 12,
+        }
+      );
+
+      // Enable the map event system.
+      var mapevents = new H.mapevents.MapEvents(map);
+
+      // Enable map interaction (pan, zoom, pinch-to-zoom).
+      var behavior = new H.mapevents.Behavior(mapevents);
+
+      // Enable the default UI.
+      var ui = H.ui.UI.createDefault(map, maptypes);
+
+      // If the window is resized, we need to resize the viewport.
+      window.addEventListener("resize", function () {
+        map.getViewPort().resize();
+      });
+
+      // Enable marker drag & drop on map.
+      enableDragAndDrop(map, behavior);
+
+    //   // Add API Release information.
+    //   releaseInfoTxt.innerHTML += "JS API: 3." + H.buildInfo().version;
+    //   loadMRSVersionTxt();
+    //   loadGeocoderVersionTxt();
+
+      // Focus on search input.
+      document.getElementById("search").focus();
+
+      // Init autocomplete.
+      initAutocomplete();
+
+      // Focus on search input.
+      document.getElementById("search").focus();
+
+      // Init autocomplete.
+      initAutocomplete();
+
+      /**
+       * Initializes the Geocoder Autocomplete widget.
+       */
+      function initAutocomplete() {
+        // // Configure autocomplete widget using vanilla JavaScript.
+        // const autocomplete = {
+        //   _renderItem: function (ul, item) {
+        //     const li = document.createElement("li");
+        //     li.textContent = item.label;
+        //     ul.appendChild(li);
+        //   },
+        // };
+
+        const searchInput = document.getElementById("search");
+
+        searchInput.addEventListener("input", function (event) {
+          if (event.target.value.length >= 2) {
+            fetchAutocompleteSuggestions(event.target.value);
+          }
+        });
+
+        searchInput.addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            document
+              .querySelectorAll(".ui-menu-item")
+              .forEach((item) => (item.style.display = "none"));
+            geocode(searchInput.value);
+          }
+        });
+
+        function fetchAutocompleteSuggestions(query) {
+          geocoder.autocomplete(
+            {
+              q: encodeURIComponent(query),
+              limit: 5,
+              lang: "en-US",
+            },
+            onSuccess,
+            onError
+          );
+
+          function onSuccess(data) {
+            const suggestions = data.items.map((item) => {
+              const label = item.title.split(", ").reverse().join();
+              const value = label.replace(/(<mark>|<\/mark>)/gm, "");
+              const name = label;
+              return { label: name, value: value };
+            });
+            // renderSuggestions(suggestions);
+          }
+
+          function onError(e) {
+            console.error("Error fetching suggestions:", e);
+          }
+        }
+
+        // function renderSuggestions(suggestions) {
+        //   const ul = document.getElementById("autocomplete-list");
+        //   ul.innerHTML = ""; // Clear previous suggestions
+
+        //   suggestions.forEach((item) => autocomplete._renderItem(ul, item));
+        // }
+      }
+
+      /**
+       * Enables object drag & drop on given map.
+       */
+      function enableDragAndDrop(map, behavior) {
+        // Disable the default draggability of the underlying map
+        // when starting to drag a marker object.
+        map.addEventListener(
+          "dragstart",
+          function (e) {
+            var target = e.target;
+            if (target instanceof H.map.Marker) {
+              // Disable default behavior related to drag & drop.
+              behavior.disable();
+            }
+          },
+          false
+        );
+
+        // Re-enable the default draggability of the underlying map
+        // when dragging has completed.
+        map.addEventListener(
+          "dragend",
+          function (e) {
+            var target = e.target;
+            if (target instanceof H.map.Marker) {
+              // Get latest dragged position and reverse geocode it.
+              var pointer = e.currentPointer;
+              var point = map.screenToGeo(pointer.viewportX, pointer.viewportY);
+              reverseGeocode(point);
+              // Enable behavior again.
+              behavior.enable();
+            }
+          },
+          false
+        );
+
+        // Listen to the drag event and move the position of the marker
+        // as necessary.
+        map.addEventListener(
+          "drag",
+          function (e) {
+            var target = e.target;
+            if (target instanceof H.map.Marker) {
+              // Update position.
+              var pointer = e.currentPointer;
+              var point = map.screenToGeo(pointer.viewportX, pointer.viewportY);
+              target.setGeometry(point);
+            }
+          },
+          false
+        );
+      }
+
+      /**
+       * Wraps geocoder service.
+       */
+      function geocode(address) {
+        geocoder.geocode(
+          {
+            q: address,
+            limit: 5,
+            lang: "en-US",
+          },
+          onSuccess,
+          onError
+        );
+
+        function onSuccess(result) {
+          // Clear map.
+          map.removeObjects(map.getObjects());
+          var locations = result.items;
+
+          // Add a marker for each location found
+          locations.forEach((location) => {
+            // Create and add marker.
+            var marker = new H.map.Marker(location.position);
+            marker.draggable = true;
+            map.addObject(marker);
+          });
+
+          // Set result label to search value.
+          var label = locations[0].address.label;
+
+          // Update search input.
+          document.getElementById("search").value = label;
+          // Blur the element to prevent the keyboard from showing up on mobile devices
+          document.getElementById("search").blur();
+
+          // Set map view.
+          var mapview = new H.geo.Rect(
+            locations[0].mapView.north,
+            locations[0].mapView.west,
+            locations[0].mapView.south,
+            locations[0].mapView.east
+          );
+          map.getViewModel().setLookAtData({ bounds: mapview }, true);
+        }
+
+        function onError(error) {
+          console.error("Error while geocoding: " + error);
+        }
+      }
+
+      /**
+       * Wraps reverse geocoder service.
+       */
+      function reverseGeocode(point) {
+        geocoder.reverseGeocode(
+          {
+            in: `circle:${point.lat},${point.lng};r=100`,
+            limit: 1,
+            types: "address",
+            lang: "en-US",
+          },
+          onSuccess,
+          onError
+        );
+
+        function onSuccess(result) {
+          var locations = result.items;
+
+          // Set result label to search value.
+          var label = locations[0].address.label;
+          document.getElementById("search").value = label;
+        }
+
+        function onError(error) {
+          console.error("Error while reverse geocoding: " + error);
+        }
+      }
+    </script>
+  </body>
+</html>
